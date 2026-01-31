@@ -1,0 +1,9 @@
+# Keep API keys private
+tracker.js
+
+# macOS files
+.DS_Store
+
+# Editor files
+.vscode/
+*.swp

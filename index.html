@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>bakkerstraat</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    :root {
+      --primary: #00d4ff;
+      --dark: #0a0a0a;
+      --dark-secondary: #1a1a1a;
+      --text: #e0e0e0;
+      --text-muted: #888;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--dark);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    
+    /* Animated background */
+    .bg-gradient {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+      z-index: -2;
+    }
+    
+    .bg-gradient::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.05) 0%, transparent 50%);
+      animation: rotate 30s linear infinite;
+    }
+    
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    /* Header */
+    header {
+      min-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    
+    .logo {
+      font-size: 5em;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, var(--primary) 0%, #fff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 700;
+      letter-spacing: -3px;
+    }
+    
+    .tagline {
+      font-size: 1.8em;
+      color: var(--text-muted);
+      font-weight: 300;
+      margin-bottom: 40px;
+    }
+    
+    .subtitle {
+      font-size: 1.1em;
+      color: var(--text);
+      max-width: 600px;
+      line-height: 1.8;
+    }
+    
+    /* Navigation */
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 60px 0 80px;
+      flex-wrap: wrap;
+    }
+    
+    .nav-btn {
+      padding: 15px 35px;
+      background: var(--dark-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 1.05em;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: inline-block;
+    }
+    
+    .nav-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+    }
+    
+    /* Projects Section */
+    .section {
+      margin: 100px 0;
+    }
+    
+    .section-title {
+      font-size: 2.5em;
+      margin-bottom: 50px;
+      font-weight: 600;
+      text-align: center;
+    }
+    
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+    
+    .project-card {
+      background: var(--dark-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      padding: 40px;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+    
+    .project-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-10px);
+      box-shadow: 0 20px 40px rgba(0, 212, 255, 0.1);
+    }
+    
+    .project-icon {
+      font-size: 4em;
+      margin-bottom: 20px;
+      display: block;
+    }
+    
+    .project-title {
+      font-size: 1.5em;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+    
+    .project-description {
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    
+    .project-link {
+      display: inline-block;
+      margin-top: 10px;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+    
+    .project-link:hover {
+      transform: translateX(5px);
+    }
+    
+    /* Footer */
+    footer {
+      margin-top: 120px;
+      padding: 40px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9em;
+    }
+    
+    footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    
+    footer a:hover {
+      text-decoration: underline;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .logo {
+        font-size: 3em;
+      }
+      
+      .tagline {
+        font-size: 1.3em;
+      }
+      
+      .section-title {
+        font-size: 2em;
+      }
+      
+      .projects-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1 class="logo">bakkerstraat</h1>
+      <p class="tagline">Music Production • Creative Tech • Finance</p>
+      <p class="subtitle">
+        Electronic music producer exploring the intersection of sound, technology, 
+        and quantitative analysis through creative projects and technical experiments.
+      </p>
+    </header>
+    
+    <!-- Navigation -->
+    <nav>
+      <a href="https://soundcloud.com/bakkerstraat" target="_blank" class="nav-btn">SoundCloud</a>
+      <a href="https://github.com/bakkerstraat" target="_blank" class="nav-btn">GitHub</a>
+      <a href="tracker.html" class="nav-btn">Metal-Crypto Tracker</a>
+    </nav>
+    
+    <!-- Projects Section -->
+    <section class="section">
+      <h2 class="section-title">Projects</h2>
+      
+      <div class="projects-grid">
+        <div class="project-card">
+          <span class="project-icon">🎹</span>
+          <h3 class="project-title">Bakkerstraat</h3>
+          <p class="project-description">
+            Electronic music
+          </p>
+          <a href="https://soundcloud.com/bakkerstraat" target="_blank" class="project-link">Listen on SoundCloud →</a>
+        </div>
+        
+        <div class="project-card">
+          <span class="project-icon">🔊</span>
+          <h3 class="project-title">Audio Tech</h3>
+          <p class="project-description">
+            Experiments in spatial audio, VST development, and 
+            audio plugin formats (VST2/VST3).
+          </p>
+        </div>
+        
+        <div class="project-card">
+          <span class="project-icon">📊</span>
+          <h3 class="project-title">Metal-Crypto Tracker</h3>
+          <p class="project-description">
+            Real-time price monitoring for gold, silver, and Bitcoin 
+            with interactive charts and technical analysis.
+          </p>
+          <a href="tracker.html" class="project-link">View Tracker →</a>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer>
+      <p>
+        <a href="https://soundcloud.com/bakkerstraat" target="_blank">SoundCloud</a> • 
+        <a href="https://github.com/bakkerstraat" target="_blank">GitHub</a>
+      </p>
+      <p style="margin-top: 15px;">
+        © 2026 bakkerstraat
+      </p>
+    </footer>
+  </div>
+</body>
+</html>
