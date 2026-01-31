@@ -94,7 +94,8 @@ async function fetchMetalPrices() {
       return;
     }
     
-    const response = await fetch(CONFIG.goldPriceZ.endpoint, {
+    const proxyUrl = 'https://corsproxy.io/?';
+    const response = await fetch(proxyUrl + encodeURIComponent(CONFIG.goldPriceZ.endpoint), {
       headers: {
         'X-API-KEY': CONFIG.goldPriceZ.apiKey
       }
