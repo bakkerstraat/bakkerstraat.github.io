@@ -116,7 +116,7 @@
       gap: 15px;
     }
     
-    .view-toggle {
+    .view-toggle, .timeframe-toggle {
       display: flex;
       gap: 10px;
     }
@@ -391,6 +391,13 @@
         <button class="toggle-btn active" id="individual-btn">Individual Charts</button>
         <button class="toggle-btn" id="combined-btn">Combined View</button>
       </div>
+      
+      <div class="timeframe-toggle">
+        <button class="toggle-btn" id="hourly-btn">24 Hours</button>
+        <button class="toggle-btn active" id="daily-btn">30 Days</button>
+        <button class="toggle-btn" id="weekly-btn">10 Years</button>
+      </div>
+      
       <button class="refresh-btn" id="refresh-btn">🔄 Refresh Prices</button>
     </div>
     

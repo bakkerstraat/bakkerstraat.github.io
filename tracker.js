@@ -1,14 +1,14 @@
 // Metal-Crypto Tracker JavaScript
-// APIs: GoldPriceZ (Gold/Silver) + CoinGecko (Bitcoin - free, no API key)
+// Supports hourly (24h), daily (30d), and historical (10y) views
 
 const CONFIG = {
-  goldPriceZ: {
-    apiKey: 'ac27005451ca13e98f52aa302d90090bac270054', // Your GoldPriceZ API key
-    endpoint: 'https://goldpricez.com/api/rates/currency/usd/measure/gram/metal/all'
-  },
   coinGecko: {
     endpoint: 'https://api.coingecko.com/api/v3/simple/price',
     historyEndpoint: 'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart'
+  },
+  csvUrls: {
+    hourly: 'https://raw.githubusercontent.com/bakkerstraat/bakkerstraat.github.io/main/prices_hourly.csv',
+    daily: 'https://raw.githubusercontent.com/bakkerstraat/bakkerstraat.github.io/main/prices_daily.csv'
   }
 };
 
@@ -20,10 +20,12 @@ let charts = {
 };
 
 let priceData = {
-  gold: { current: 0, history: [] },
-  silver: { current: 0, history: [] },
+  gold: { current: 0, hourly: [], daily: [] },
+  silver: { current: 0, hourly: [], daily: [] },
   bitcoin: { current: 0, history: [] }
 };
+
+let currentTimeframe = 'daily'; // 'hourly', 'daily', or 'weekly'
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,9 +36,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Setup event listeners
 function setupEventListeners() {
+  // View toggle
   document.getElementById('individual-btn').addEventListener('click', () => showIndividualView());
   document.getElementById('combined-btn').addEventListener('click', () => showCombinedView());
+  
+  // Timeframe toggle
+  document.getElementById('hourly-btn').addEventListener('click', () => switchTimeframe('hourly'));
+  document.getElementById('daily-btn').addEventListener('click', () => switchTimeframe('daily'));
+  document.getElementById('weekly-btn').addEventListener('click', () => switchTimeframe('weekly'));
+  
+  // Refresh
   document.getElementById('refresh-btn').addEventListener('click', () => fetchAllPrices());
+}
+
+// Switch timeframe
+function switchTimeframe(timeframe) {
+  currentTimeframe = timeframe;
+  
+  // Update button states
+  document.querySelectorAll('.timeframe-toggle .toggle-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.getElementById(`${timeframe}-btn`).classList.add('active');
+  
+  // Update charts with appropriate data
+  updateAllChartsWithTimeframe();
 }
 
 // View toggle
@@ -67,106 +91,129 @@ async function fetchAllPrices() {
       fetchBitcoinPrice()
     ]);
     
-    updateAllCharts();
+    updateAllChartsWithTimeframe();
     console.log('All prices updated successfully');
   } catch (error) {
     console.error('Error fetching prices:', error);
-    alert('Failed to fetch prices. Check console for details.');
   } finally {
     btn.disabled = false;
     btn.textContent = '🔄 Refresh Prices';
   }
 }
 
-// Fetch Gold & Silver from CSV file (updated by scheduled script)
+// Fetch Gold & Silver from CSV files
 async function fetchMetalPrices() {
   try {
-    // Fetch CSV from GitHub
-    const csvUrl = 'https://raw.githubusercontent.com/bakkerstraat/bakkerstraat.github.io/main/prices.csv';
-    const response = await fetch(csvUrl + '?t=' + Date.now()); // Cache-busting
+    // Fetch both hourly and daily data
+    const [hourlyData, dailyData] = await Promise.all([
+      fetchCSV(CONFIG.csvUrls.hourly),
+      fetchCSV(CONFIG.csvUrls.daily)
+    ]);
     
-    if (!response.ok) {
-      throw new Error(`CSV fetch error: ${response.status}`);
+    // Parse hourly data
+    if (hourlyData.length > 0) {
+      priceData.gold.hourly = hourlyData.map(row => ({
+        date: new Date(row.timestamp),
+        price: parseFloat(row.gold)
+      }));
+      priceData.silver.hourly = hourlyData.map(row => ({
+        date: new Date(row.timestamp),
+        price: parseFloat(row.silver)
+      }));
+      
+      // Set current price from latest hourly data
+      const latest = hourlyData[hourlyData.length - 1];
+      priceData.gold.current = parseFloat(latest.gold);
+      priceData.silver.current = parseFloat(latest.silver);
     }
     
-    const csvText = await response.text();
-    const lines = csvText.trim().split('\n');
-    
-    // Parse CSV (skip header)
-    const dataLines = lines.slice(1);
-    
-    if (dataLines.length === 0) {
-      throw new Error('No price data in CSV');
-    }
-    
-    // Get latest price (last line)
-    const lastLine = dataLines[dataLines.length - 1];
-    const [timestamp, gold, silver] = lastLine.split(',');
-    
-    priceData.gold.current = parseFloat(gold);
-    priceData.silver.current = parseFloat(silver);
-    
-    // Build historical data from CSV
-    const goldHistory = [];
-    const silverHistory = [];
-    
-    dataLines.forEach(line => {
-      const [ts, g, s] = line.split(',');
-      const date = new Date(ts);
-      goldHistory.push({ date, price: parseFloat(g) });
-      silverHistory.push({ date, price: parseFloat(s) });
-    });
-    
-    // Use last 30 days or all data if less
-    priceData.gold.history = goldHistory.slice(-30);
-    priceData.silver.history = silverHistory.slice(-30);
-    
-    // If not enough data, pad with mock data
-    if (priceData.gold.history.length < 30) {
-      const mockGold = generateMockHistory(priceData.gold.current, 30 - priceData.gold.history.length);
-      priceData.gold.history = [...mockGold, ...priceData.gold.history];
-    }
-    if (priceData.silver.history.length < 30) {
-      const mockSilver = generateMockHistory(priceData.silver.current, 30 - priceData.silver.history.length);
-      priceData.silver.history = [...mockSilver, ...priceData.silver.history];
+    // Parse daily data
+    if (dailyData.length > 0) {
+      priceData.gold.daily = dailyData.map(row => ({
+        date: new Date(row.date + 'T12:00:00'), // Set to noon to avoid timezone issues
+        price: parseFloat(row.gold)
+      }));
+      priceData.silver.daily = dailyData.map(row => ({
+        date: new Date(row.date + 'T12:00:00'),
+        price: parseFloat(row.silver)
+      }));
+      
+      // Use daily data for current price if no hourly data
+      if (hourlyData.length === 0) {
+        const latest = dailyData[dailyData.length - 1];
+        priceData.gold.current = parseFloat(latest.gold);
+        priceData.silver.current = parseFloat(latest.silver);
+      }
     }
     
     updatePriceDisplay('gold', priceData.gold.current);
     updatePriceDisplay('silver', priceData.silver.current);
     
-    console.log('Metal prices loaded from CSV:', { gold: priceData.gold.current, silver: priceData.silver.current });
+    console.log('Metal prices loaded:', {
+      gold: priceData.gold.current,
+      silver: priceData.silver.current,
+      hourlyPoints: priceData.gold.hourly.length,
+      dailyPoints: priceData.gold.daily.length
+    });
     
   } catch (error) {
     console.error('Metal prices fetch error:', error);
     // Fallback to demo data
     priceData.gold.current = 2850;
     priceData.silver.current = 32.50;
-    priceData.gold.history = generateMockHistory(2850, 30);
-    priceData.silver.history = generateMockHistory(32.50, 30);
+    priceData.gold.hourly = generateMockHistory(2850, 24, 'hourly');
+    priceData.silver.hourly = generateMockHistory(32.50, 24, 'hourly');
+    priceData.gold.daily = generateMockHistory(2850, 30, 'daily');
+    priceData.silver.daily = generateMockHistory(32.50, 30, 'daily');
     updatePriceDisplay('gold', priceData.gold.current);
     updatePriceDisplay('silver', priceData.silver.current);
   }
 }
 
-// Fetch Bitcoin from CoinGecko (free, no API key needed)
+// Fetch and parse CSV file
+async function fetchCSV(url) {
+  try {
+    const response = await fetch(url + '?t=' + Date.now()); // Cache-busting
+    if (!response.ok) throw new Error(`CSV fetch error: ${response.status}`);
+    
+    const csvText = await response.text();
+    const lines = csvText.trim().split('\n');
+    const headers = lines[0].split(',');
+    
+    return lines.slice(1).map(line => {
+      const values = line.split(',');
+      const row = {};
+      headers.forEach((header, i) => {
+        row[header] = values[i];
+      });
+      return row;
+    });
+  } catch (error) {
+    console.warn(`Failed to fetch ${url}:`, error);
+    return [];
+  }
+}
+
+// Fetch Bitcoin from CoinGecko
 async function fetchBitcoinPrice() {
   try {
+    // Determine days based on timeframe
+    const days = currentTimeframe === 'hourly' ? 1 : currentTimeframe === 'daily' ? 30 : 365;
+    
     // Current price
     const priceResponse = await fetch(
       `${CONFIG.coinGecko.endpoint}?ids=bitcoin&vs_currencies=usd&include_24hr_change=true`
     );
     
-    if (!priceResponse.ok) {
-      throw new Error(`CoinGecko API error: ${priceResponse.status}`);
-    }
+    if (!priceResponse.ok) throw new Error(`CoinGecko API error: ${priceResponse.status}`);
     
-    const priceData = await priceResponse.json();
-    const currentPrice = priceData.bitcoin.usd;
-    const change24h = priceData.bitcoin.usd_24h_change;
+    const priceData_temp = await priceResponse.json();
+    const currentPrice = priceData_temp.bitcoin.usd;
+    const change24h = priceData_temp.bitcoin.usd_24h_change;
     
-    // Historical data (30 days)
+    // Historical data
     const historyResponse = await fetch(
-      `${CONFIG.coinGecko.historyEndpoint}?vs_currency=usd&days=30&interval=daily`
+      `${CONFIG.coinGecko.historyEndpoint}?vs_currency=usd&days=${days}&interval=${currentTimeframe === 'hourly' ? 'hourly' : 'daily'}`
     );
     
     const historyData = await historyResponse.json();
@@ -182,9 +229,8 @@ async function fetchBitcoinPrice() {
     
   } catch (error) {
     console.error('Bitcoin price fetch error:', error);
-    // Show mock data if API fails
-    priceData.bitcoin.current = 95000; // Approximate current BTC price
-    priceData.bitcoin.history = generateMockHistory(95000, 30);
+    priceData.bitcoin.current = 95000;
+    priceData.bitcoin.history = generateMockHistory(95000, currentTimeframe === 'hourly' ? 24 : 30, currentTimeframe === 'hourly' ? 'hourly' : 'daily');
     updatePriceDisplay('bitcoin', priceData.bitcoin.current, 2.5);
   }
 }
@@ -208,26 +254,42 @@ function updatePriceDisplay(asset, price, change = null) {
   }
 }
 
-// Generate mock historical data (temporary - replace with real API later)
-function generateMockHistory(currentPrice, days) {
+// Generate mock historical data
+function generateMockHistory(currentPrice, points, type) {
   const history = [];
   const now = new Date();
+  const interval = type === 'hourly' ? 3600000 : 86400000; // 1 hour or 1 day in ms
   
-  for (let i = days; i >= 0; i--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-    
-    // Random walk around current price
-    const variance = currentPrice * 0.15; // 15% variance
+  for (let i = points; i >= 0; i--) {
+    const date = new Date(now.getTime() - (i * interval));
+    const variance = currentPrice * 0.15;
     const randomPrice = currentPrice + (Math.random() - 0.5) * variance;
     
-    history.push({
-      date: date,
-      price: randomPrice
-    });
+    history.push({ date, price: randomPrice });
   }
   
   return history;
+}
+
+// Get data for current timeframe
+function getDataForTimeframe(asset) {
+  if (asset === 'bitcoin') {
+    return priceData.bitcoin.history;
+  }
+  
+  switch (currentTimeframe) {
+    case 'hourly':
+      // Last 24 hours from hourly data
+      return priceData[asset].hourly.slice(-24);
+    case 'daily':
+      // Last 30 days from daily data
+      return priceData[asset].daily.slice(-30);
+    case 'weekly':
+      // All daily data (10 years)
+      return priceData[asset].daily;
+    default:
+      return priceData[asset].daily.slice(-30);
+  }
 }
 
 // Initialize all charts
@@ -381,11 +443,25 @@ function initializeCharts() {
   });
 }
 
-// Update individual charts
-function updateAllCharts() {
-  updateChart(charts.gold, priceData.gold.history);
-  updateChart(charts.silver, priceData.silver.history);
-  updateChart(charts.bitcoin, priceData.bitcoin.history);
+// Update all charts with current timeframe
+function updateAllChartsWithTimeframe() {
+  // Update time unit based on timeframe
+  const timeUnit = currentTimeframe === 'hourly' ? 'hour' : 
+                   currentTimeframe === 'weekly' ? 'month' : 'day';
+  
+  [charts.gold, charts.silver, charts.bitcoin, charts.combined].forEach(chart => {
+    if (chart) {
+      chart.options.scales.x.time.unit = timeUnit;
+    }
+  });
+  
+  updateChart(charts.gold, getDataForTimeframe('gold'));
+  updateChart(charts.silver, getDataForTimeframe('silver'));
+  updateChart(charts.bitcoin, getDataForTimeframe('bitcoin'));
+  
+  charts.gold.update();
+  charts.silver.update();
+  charts.bitcoin.update();
 }
 
 function updateChart(chart, history) {
@@ -401,7 +477,7 @@ function updateCombinedChart() {
   const datasets = ['gold', 'silver', 'bitcoin'];
   
   datasets.forEach((asset, index) => {
-    const history = priceData[asset].history;
+    const history = getDataForTimeframe(asset);
     if (history.length === 0) return;
     
     const basePrice = history[0].price;
@@ -415,6 +491,3 @@ function updateCombinedChart() {
   
   charts.combined.update();
 }
-
-// Make priceData accessible globally for Bitcoin fetch
-window.priceData = priceData;
