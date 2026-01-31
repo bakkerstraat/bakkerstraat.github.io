@@ -3,7 +3,7 @@
 
 const CONFIG = {
   goldPriceZ: {
-    apiKey: 'ac27005451ca13e98f52aa302d90090bac270054', // Your GoldPriceZ API key
+    apiKey: 'ac27005451ca13e98f52aa302d90090bac270054', // Replace with your GoldPriceZ API key
     endpoint: 'https://goldpricez.com/api/rates/currency/usd/measure/gram/metal/all'
   },
   coinGecko: {
@@ -78,63 +78,47 @@ async function fetchAllPrices() {
   }
 }
 
-// Fetch Gold & Silver from CSV file (updated by scheduled script)
+// Fetch Gold & Silver from GoldPriceZ
 async function fetchMetalPrices() {
   try {
-    // Fetch CSV from GitHub
-    const csvUrl = 'https://raw.githubusercontent.com/bakkerstraat/bakkerstraat.github.io/main/prices.csv';
-    const response = await fetch(csvUrl + '?t=' + Date.now()); // Cache-busting
-    
-    if (!response.ok) {
-      throw new Error(`CSV fetch error: ${response.status}`);
+    // Check if API key is set
+    if (!CONFIG.goldPriceZ.apiKey || CONFIG.goldPriceZ.apiKey === 'YOUR_API_KEY_HERE') {
+      console.warn('GoldPriceZ API key not set. Using demo data.');
+      // Use demo data
+      priceData.gold.current = 2850;
+      priceData.silver.current = 32.50;
+      priceData.gold.history = generateMockHistory(2850, 30);
+      priceData.silver.history = generateMockHistory(32.50, 30);
+      updatePriceDisplay('gold', priceData.gold.current);
+      updatePriceDisplay('silver', priceData.silver.current);
+      return;
     }
     
-    const csvText = await response.text();
-    const lines = csvText.trim().split('\n');
-    
-    // Parse CSV (skip header)
-    const dataLines = lines.slice(1);
-    
-    if (dataLines.length === 0) {
-      throw new Error('No price data in CSV');
-    }
-    
-    // Get latest price (last line)
-    const lastLine = dataLines[dataLines.length - 1];
-    const [timestamp, gold, silver] = lastLine.split(',');
-    
-    priceData.gold.current = parseFloat(gold);
-    priceData.silver.current = parseFloat(silver);
-    
-    // Build historical data from CSV
-    const goldHistory = [];
-    const silverHistory = [];
-    
-    dataLines.forEach(line => {
-      const [ts, g, s] = line.split(',');
-      const date = new Date(ts);
-      goldHistory.push({ date, price: parseFloat(g) });
-      silverHistory.push({ date, price: parseFloat(s) });
+    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+    const response = await fetch(proxyUrl + CONFIG.goldPriceZ.endpoint, {
+      headers: {
+        'X-API-KEY': CONFIG.goldPriceZ.apiKey
+      }
     });
     
-    // Use last 30 days or all data if less
-    priceData.gold.history = goldHistory.slice(-30);
-    priceData.silver.history = silverHistory.slice(-30);
+    if (!response.ok) {
+      throw new Error(`GoldPriceZ API error: ${response.status}`);
+    }
     
-    // If not enough data, pad with mock data
-    if (priceData.gold.history.length < 30) {
-      const mockGold = generateMockHistory(priceData.gold.current, 30 - priceData.gold.history.length);
-      priceData.gold.history = [...mockGold, ...priceData.gold.history];
-    }
-    if (priceData.silver.history.length < 30) {
-      const mockSilver = generateMockHistory(priceData.silver.current, 30 - priceData.silver.history.length);
-      priceData.silver.history = [...mockSilver, ...priceData.silver.history];
-    }
+    const data = await response.json();
+    
+    // Convert from per gram to per troy ounce (1 troy oz = 31.1035 grams)
+    const gramToOz = 31.1035;
+    
+    priceData.gold.current = parseFloat(data.gram_in_usd) * gramToOz;
+    priceData.silver.current = parseFloat(data.silver_gram_in_usd) * gramToOz;
+    
+    // Generate mock historical data (replace with real historical API later)
+    priceData.gold.history = generateMockHistory(priceData.gold.current, 30);
+    priceData.silver.history = generateMockHistory(priceData.silver.current, 30);
     
     updatePriceDisplay('gold', priceData.gold.current);
     updatePriceDisplay('silver', priceData.silver.current);
-    
-    console.log('Metal prices loaded from CSV:', { gold: priceData.gold.current, silver: priceData.silver.current });
     
   } catch (error) {
     console.error('Metal prices fetch error:', error);
