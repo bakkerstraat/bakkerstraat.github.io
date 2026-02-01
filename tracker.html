@@ -323,6 +323,14 @@
       height: 300px;
     }
     
+    .chart-source {
+      text-align: center;
+      font-size: 0.85em;
+      color: var(--text-muted);
+      margin-top: 10px;
+      font-style: italic;
+    }
+    
     .chart-grid.collapsed .chart-container {
       height: 400px;
     }
@@ -451,12 +459,6 @@
     
     <!-- Controls -->
     <div class="controls">
-      <!-- Data Source Toggle -->
-      <div class="source-toggle">
-        <button class="toggle-btn active" id="kraken-btn">Kraken</button>
-        <button class="toggle-btn" id="goldpricez-btn">GoldPriceZ</button>
-      </div>
-      
       <!-- View Toggle -->
       <div class="view-toggle">
         <button class="toggle-btn active" id="individual-btn">Individual</button>
@@ -496,6 +498,7 @@
         <div class="chart-container">
           <canvas id="gold-chart"></canvas>
         </div>
+        <div class="chart-source">Source: Kraken</div>
       </div>
       
       <!-- Silver Chart -->
@@ -513,6 +516,7 @@
         <div class="chart-container">
           <canvas id="silver-chart"></canvas>
         </div>
+        <div class="chart-source">Source: Hyperliquid</div>
       </div>
       
       <!-- Bitcoin Chart -->
@@ -530,6 +534,7 @@
         <div class="chart-container">
           <canvas id="bitcoin-chart"></canvas>
         </div>
+        <div class="chart-source">Source: Kraken</div>
       </div>
     </div>
     

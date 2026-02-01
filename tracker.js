@@ -11,14 +11,16 @@ const CONFIG = {
     assetPairs: 'https://api.kraken.com/0/public/AssetPairs',
     pairs: {
       gold: 'XAUTUSD',
-      silver: 'PAXGUSD',
       bitcoin: 'XXBTZUSD'
     }
+  },
+  hyperliquid: {
+    info: 'https://api.hyperliquid.xyz/info',
+    silver: 'AG' // Silver perpetual
   }
 };
 
 let state = {
-  dataSource: 'kraken',
   timeframe: '1D',
   viewMode: 'individual',
   krakenPairs: []
@@ -55,8 +57,6 @@ function setupEventListeners() {
   document.getElementById('1h-btn').addEventListener('click', () => switchTimeframe('1H'));
   document.getElementById('1d-btn').addEventListener('click', () => switchTimeframe('1D'));
   document.getElementById('1w-btn').addEventListener('click', () => switchTimeframe('1W'));
-  document.getElementById('kraken-btn').addEventListener('click', () => switchDataSource('kraken'));
-  document.getElementById('goldpricez-btn').addEventListener('click', () => switchDataSource('goldpricez'));
   document.getElementById('refresh-btn').addEventListener('click', () => fetchAllPrices());
   
   const searchInput = document.getElementById('asset-search');
@@ -70,13 +70,6 @@ function handleAutocomplete(e) {
   if (value.length < 2) return;
   const matches = state.krakenPairs.filter(p => p.includes(value)).slice(0, 5);
   console.log('Suggestions:', matches);
-}
-
-function switchDataSource(source) {
-  state.dataSource = source;
-  document.querySelectorAll('.source-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(`${source}-btn`).classList.add('active');
-  fetchAllPrices();
 }
 
 function switchTimeframe(tf) {
@@ -111,8 +104,7 @@ async function fetchAllPrices() {
   btn.textContent = 'Loading...';
   
   try {
-    if (state.dataSource === 'kraken') await fetchKrakenData();
-    else await fetchGoldPriceZData();
+    await fetchKrakenData();
     updateAllCharts();
   } catch (error) {
     console.error('Error:', error);
@@ -125,6 +117,7 @@ async function fetchAllPrices() {
 async function fetchKrakenData() {
   const intervals = { '1H': 60, '1D': 1440, '1W': 10080 };
   
+  // Fetch Gold and Bitcoin from Kraken
   for (const [asset, pair] of Object.entries(CONFIG.kraken.pairs)) {
     for (const [tf, interval] of Object.entries(intervals)) {
       try {
@@ -135,7 +128,7 @@ async function fetchKrakenData() {
         if (data.error && data.error.length > 0) {
           console.error(`Kraken error for ${asset}:`, data.error);
           if (!priceData[asset].data[tf]) {
-            priceData[asset].data[tf] = generateMockData(2800, tf);
+            priceData[asset].data[tf] = generateMockCandles(2800, tf);
             priceData[asset].current = 2800;
           }
           continue;
@@ -145,7 +138,14 @@ async function fetchKrakenData() {
         if (!pairKey) continue;
         
         const candles = data.result[pairKey];
-        priceData[asset].data[tf] = candles.map(c => ({ x: c[0] * 1000, y: parseFloat(c[4]) }));
+        priceData[asset].data[tf] = candles.map(c => ({
+          x: c[0] * 1000,
+          o: parseFloat(c[1]),
+          h: parseFloat(c[2]),
+          l: parseFloat(c[3]),
+          c: parseFloat(c[4]),
+          y: parseFloat(c[4]) // For line chart
+        }));
         
         if (tf === state.timeframe && candles.length > 0) {
           priceData[asset].current = parseFloat(candles[candles.length - 1][4]);
@@ -153,6 +153,77 @@ async function fetchKrakenData() {
         }
       } catch (error) {
         console.error(`Error fetching ${asset} ${tf}:`, error);
+      }
+    }
+  }
+  
+  // Fetch Silver from Hyperliquid
+  await fetchHyperliquidSilver();
+}
+
+async function fetchHyperliquidSilver() {
+  const intervals = {
+    '1H': '1h',
+    '1D': '1d',
+    '1W': '1w'
+  };
+  
+  console.log('Fetching silver from Hyperliquid...');
+  
+  for (const [tf, interval] of Object.entries(intervals)) {
+    try {
+      const endTime = Date.now();
+      const startTime = endTime - (tf === '1H' ? 24 * 3600000 : tf === '1D' ? 30 * 86400000 : 52 * 604800000);
+      
+      const payload = {
+        type: 'candleSnapshot',
+        req: {
+          coin: CONFIG.hyperliquid.silver,
+          interval: interval,
+          startTime: startTime,
+          endTime: endTime
+        }
+      };
+      
+      const response = await fetch(CONFIG.hyperliquid.info, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      
+      if (!data || data.length === 0) {
+        console.warn(`No Hyperliquid data for silver ${tf}`);
+        if (!priceData.silver.data[tf]) {
+          priceData.silver.data[tf] = generateMockData(32, tf);
+          priceData.silver.current = 32;
+        }
+        continue;
+      }
+      
+      // Hyperliquid format: {t: timestamp, o: open, h: high, l: low, c: close, v: volume}
+      priceData.silver.data[tf] = data.map(c => ({
+        x: c.t,
+        o: parseFloat(c.o),
+        h: parseFloat(c.h),
+        l: parseFloat(c.l),
+        c: parseFloat(c.c),
+        y: parseFloat(c.c)
+      }));
+      
+      if (tf === state.timeframe && data.length > 0) {
+        priceData.silver.current = parseFloat(data[data.length - 1].c);
+        updatePriceDisplay('silver', priceData.silver.current);
+      }
+      
+      console.log(`✓ Hyperliquid silver ${tf}: ${data.length} candles`);
+      
+    } catch (error) {
+      console.error(`Error fetching Hyperliquid silver ${tf}:`, error);
+      if (!priceData.silver.data[tf]) {
+        priceData.silver.data[tf] = generateMockData(32, tf);
+        priceData.silver.current = 32;
       }
     }
   }
@@ -207,14 +278,26 @@ async function fetchKrakenAsset(asset, pair) {
   }
 }
 
-function generateMockData(basePrice, tf) {
+function generateMockCandles(basePrice, tf) {
   const count = tf === '1H' ? 24 : tf === '1D' ? 30 : 52;
   const interval = tf === '1H' ? 3600000 : tf === '1D' ? 86400000 : 604800000;
   const data = [];
   const now = Date.now();
+  let price = basePrice;
   
   for (let i = count; i >= 0; i--) {
-    data.push({ x: now - (i * interval), y: basePrice + (Math.random() - 0.5) * basePrice * 0.02 });
+    const variance = basePrice * 0.02;
+    const o = price + (Math.random() - 0.5) * variance;
+    const c = price + (Math.random() - 0.5) * variance;
+    const h = Math.max(o, c) + Math.random() * variance * 0.3;
+    const l = Math.min(o, c) - Math.random() * variance * 0.3;
+    
+    data.push({
+      x: now - (i * interval),
+      o, h, l, c,
+      y: c
+    });
+    price = c;
   }
   return data;
 }
@@ -227,34 +310,72 @@ function updatePriceDisplay(asset, price) {
 }
 
 function initializeCharts() {
-  const commonOpts = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { type: 'time', time: { unit: 'day' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } },
-      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888', callback: (v) => '$' + v.toFixed(0) } }
+  // Helper to create candlestick chart config
+  const createCandlestickChart = (color, label) => ({
+    type: 'bar',
+    data: {
+      datasets: [{
+        label: label,
+        data: [],
+        backgroundColor: (ctx) => {
+          if (!ctx.raw || !ctx.raw.o) return color;
+          return ctx.raw.c >= ctx.raw.o ? 'rgba(0,200,0,0.8)' : 'rgba(255,50,50,0.8)';
+        },
+        borderColor: (ctx) => {
+          if (!ctx.raw || !ctx.raw.o) return color;
+          return ctx.raw.c >= ctx.raw.o ? '#00ff00' : '#ff0000';
+        },
+        borderWidth: 1.5,
+        barPercentage: 0.8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: {
+        xAxisKey: 'x',
+        yAxisKey: 'c'
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const d = ctx.raw;
+              if (!d || !d.o) return '';
+              return [
+                `Open: $${d.o.toFixed(2)}`,
+                `High: $${d.h.toFixed(2)}`,
+                `Low: $${d.l.toFixed(2)}`,
+                `Close: $${d.c.toFixed(2)}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'day' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#888' }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            color: '#888',
+            callback: (v) => '$' + v.toFixed(0)
+          }
+        }
+      }
     }
-  };
-  
-  charts.gold = new Chart(document.getElementById('gold-chart'), {
-    type: 'line',
-    data: { datasets: [{ label: 'Gold', data: [], borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 2, fill: true, tension: 0.4 }] },
-    options: commonOpts
   });
   
-  charts.silver = new Chart(document.getElementById('silver-chart'), {
-    type: 'line',
-    data: { datasets: [{ label: 'Silver', data: [], borderColor: '#C0C0C0', backgroundColor: 'rgba(192,192,192,0.1)', borderWidth: 2, fill: true, tension: 0.4 }] },
-    options: commonOpts
-  });
+  charts.gold = new Chart(document.getElementById('gold-chart'), createCandlestickChart('#FFD700', 'Gold'));
+  charts.silver = new Chart(document.getElementById('silver-chart'), createCandlestickChart('#C0C0C0', 'Silver'));
+  charts.bitcoin = new Chart(document.getElementById('bitcoin-chart'), createCandlestickChart('#F7931A', 'Bitcoin'));
   
-  charts.bitcoin = new Chart(document.getElementById('bitcoin-chart'), {
-    type: 'line',
-    data: { datasets: [{ label: 'Bitcoin', data: [], borderColor: '#F7931A', backgroundColor: 'rgba(247,147,26,0.1)', borderWidth: 2, fill: true, tension: 0.4 }] },
-    options: commonOpts
-  });
-  
+  // Combined chart with multiple Y-axes (line chart)
   charts.combined = new Chart(document.getElementById('combined-chart'), {
     type: 'line',
     data: {
