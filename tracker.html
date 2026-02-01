@@ -109,16 +109,80 @@
     /* Controls */
     .controls {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       flex-wrap: wrap;
       gap: 15px;
     }
     
-    .view-toggle, .timeframe-toggle {
+    .view-toggle, .timeframe-toggle, .source-toggle {
       display: flex;
+      gap: 5px;
+    }
+    
+    /* Custom Asset Search */
+    .custom-asset-search {
+      display: flex;
+      justify-content: center;
       gap: 10px;
+      margin-bottom: 30px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .custom-asset-search input {
+      flex: 1;
+      padding: 12px 20px;
+      background: var(--dark-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95em;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .custom-asset-search input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    
+    .custom-asset-search input::placeholder {
+      color: var(--text-muted);
+    }
+    
+    .add-btn {
+      padding: 12px 25px;
+      background: var(--accent);
+      color: var(--dark);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95em;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .add-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+    }
+    
+    .remove-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2em;
+      padding: 0 5px;
+      margin-left: 10px;
+      transition: color 0.3s;
+    }
+    
+    .remove-btn:hover {
+      color: #ef4444;
     }
     
     .toggle-btn {
@@ -387,18 +451,32 @@
     
     <!-- Controls -->
     <div class="controls">
+      <!-- Data Source Toggle -->
+      <div class="source-toggle">
+        <button class="toggle-btn active" id="kraken-btn">Kraken</button>
+        <button class="toggle-btn" id="goldpricez-btn">GoldPriceZ</button>
+      </div>
+      
+      <!-- View Toggle -->
       <div class="view-toggle">
-        <button class="toggle-btn active" id="individual-btn">Individual Charts</button>
-        <button class="toggle-btn" id="combined-btn">Combined View</button>
+        <button class="toggle-btn active" id="individual-btn">Individual</button>
+        <button class="toggle-btn" id="combined-btn">Combined</button>
       </div>
       
+      <!-- Timeframe Toggle -->
       <div class="timeframe-toggle">
-        <button class="toggle-btn" id="hourly-btn">24 Hours</button>
-        <button class="toggle-btn active" id="daily-btn">30 Days</button>
-        <button class="toggle-btn" id="weekly-btn">10 Years</button>
+        <button class="toggle-btn" id="1h-btn">1H</button>
+        <button class="toggle-btn active" id="1d-btn">1D</button>
+        <button class="toggle-btn" id="1w-btn">1W</button>
       </div>
       
-      <button class="refresh-btn" id="refresh-btn">🔄 Refresh Prices</button>
+      <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
+    </div>
+    
+    <!-- Custom Asset Search -->
+    <div class="custom-asset-search">
+      <input type="text" id="asset-search" placeholder="Search asset (e.g., SOL, PEPE)..." />
+      <button class="add-btn" id="add-asset-btn">+ Add Chart</button>
     </div>
     
     <!-- Charts -->
@@ -466,28 +544,17 @@
         <div class="chart-container">
           <canvas id="combined-chart"></canvas>
         </div>
-        <div class="chart-legend">
-          <div class="legend-item">
-            <div class="legend-color" style="background: #FFD700;"></div>
-            <span>Gold</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background: #C0C0C0;"></div>
-            <span>Silver</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background: #F7931A;"></div>
-            <span>Bitcoin</span>
-          </div>
-        </div>
       </div>
     </div>
     
+    <!-- Custom Assets Section -->
+    <div id="custom-charts" class="chart-grid" style="margin-top: 30px;"></div>
+    
     <!-- Footer -->
     <footer>
-      <p>Data: <a href="https://goldpricez.com" target="_blank" rel="noopener">GoldPriceZ</a> (Metals) • <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a> (Crypto)</p>
+      <p>Data: <a href="https://www.kraken.com" target="_blank" rel="noopener">Kraken</a> • <a href="https://goldpricez.com" target="_blank" rel="noopener">GoldPriceZ</a> • <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a></p>
       <p style="margin-top: 10px;">
-        <a href="https://github.com/bakkerstraat/metal-tracker" target="_blank">GitHub</a> • 
+        <a href="https://github.com/bakkerstraat" target="_blank">GitHub</a> • 
         Not financial advice • For educational purposes only
       </p>
     </footer>
@@ -495,6 +562,7 @@
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.0/dist/chartjs-chart-financial.min.js"></script>
   <script src="tracker.js"></script>
 </body>
 </html>
