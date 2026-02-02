@@ -423,9 +423,9 @@ function initializeCharts() {
     type: 'line',
     data: {
       datasets: [
-        { label: 'Gold', data: [], borderColor: '#FFD700', borderWidth: 2, tension: 0.4, yAxisID: 'y-gold' },
-        { label: 'Silver', data: [], borderColor: '#C0C0C0', borderWidth: 2, tension: 0.4, yAxisID: 'y-silver' },
-        { label: 'Bitcoin', data: [], borderColor: '#F7931A', borderWidth: 2, tension: 0.4, yAxisID: 'y-bitcoin' }
+        { label: 'Gold', data: [], borderColor: '#FFD700', borderWidth: 2, tension: 0.4, yAxisID: 'y-gold', pointRadius: 0, pointHoverRadius: 4 },
+        { label: 'Silver', data: [], borderColor: '#C0C0C0', borderWidth: 2, tension: 0.4, yAxisID: 'y-silver', pointRadius: 0, pointHoverRadius: 4 },
+        { label: 'Bitcoin', data: [], borderColor: '#F7931A', borderWidth: 2, tension: 0.4, yAxisID: 'y-bitcoin', pointRadius: 0, pointHoverRadius: 4 }
       ]
     },
     options: {
@@ -445,17 +445,20 @@ function initializeCharts() {
 function updateAllCharts() {
   const unit = state.timeframe === '1H' ? 'hour' : state.timeframe === '1D' ? 'day' : 'week';
   
-  Object.values(charts).forEach(chart => {
-    if (chart && chart.options.scales.x) chart.options.scales.x.time.unit = unit;
+  // Update individual charts
+  ['gold', 'silver', 'bitcoin'].forEach(asset => {
+    const chart = charts[asset];
+    if (chart) {
+      chart.options.scales.x.time.unit = unit;
+      chart.data.datasets[0].data = priceData[asset].data[state.timeframe] || [];
+      chart.update('none');
+    }
   });
   
-  charts.gold.data.datasets[0].data = priceData.gold.data[state.timeframe] || [];
-  charts.silver.data.datasets[0].data = priceData.silver.data[state.timeframe] || [];
-  charts.bitcoin.data.datasets[0].data = priceData.bitcoin.data[state.timeframe] || [];
-  
-  charts.gold.update();
-  charts.silver.update();
-  charts.bitcoin.update();
+  // Update combined chart time unit
+  if (charts.combined) {
+    charts.combined.options.scales.x.time.unit = unit;
+  }
 }
 
 function updateCombinedChart() {
@@ -483,9 +486,107 @@ function addCustomAsset() {
   
   if (match) {
     console.log(`Found ${symbol} on Kraken: ${match}`);
-    alert(`Found: ${match}\n\n(Custom charts feature coming soon)`);
+    
+    // Create new chart card
+    const container = document.getElementById('custom-charts');
+    const chartId = `custom-${symbol.toLowerCase()}`;
+    
+    const cardHTML = `
+      <div class="chart-card" id="${chartId}-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <span>${symbol}/USD</span>
+          </div>
+          <div class="price-info">
+            <div class="current-price" id="${chartId}-price">$—</div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="${chartId}-chart"></canvas>
+        </div>
+        <div class="chart-source">Source: Kraken</div>
+      </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', cardHTML);
+    
+    // Initialize chart
+    const chart = new Chart(document.getElementById(`${chartId}-chart`), {
+      type: 'bar',
+      plugins: [charts.gold.config._config.plugins[0]], // Use same candlestick plugin
+      data: {
+        datasets: [{
+          label: symbol,
+          data: [],
+          backgroundColor: 'transparent',
+          borderColor: 'transparent',
+          barPercentage: 0.8
+        }]
+      },
+      options: charts.gold.options // Copy gold chart options
+    });
+    
+    // Store chart reference
+    charts[chartId] = chart;
+    
+    // Fetch data for this asset
+    fetchCustomAssetData(match, chartId);
+    
     input.value = '';
   } else {
     alert(`Asset "${symbol}" not found on Kraken.\n\nTry: BTC, ETH, SOL, DOGE, etc.`);
+  }
+}
+
+async function fetchCustomAssetData(pair, chartId) {
+  const intervals = { '1H': 60, '1D': 1440, '1W': 10080 };
+  const assetData = { current: 0, data: {} };
+  
+  for (const [tf, interval] of Object.entries(intervals)) {
+    try {
+      const url = `${CONFIG.kraken.ohlc}?pair=${pair}&interval=${interval}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.error && data.error.length > 0) {
+        console.error(`Kraken error for ${pair}:`, data.error);
+        continue;
+      }
+      
+      const pairKey = Object.keys(data.result).find(k => k !== 'last');
+      if (!pairKey) continue;
+      
+      const candles = data.result[pairKey];
+      assetData.data[tf] = candles.map(c => ({
+        x: c[0] * 1000,
+        o: parseFloat(c[1]),
+        h: parseFloat(c[2]),
+        l: parseFloat(c[3]),
+        c: parseFloat(c[4]),
+        y: parseFloat(c[4])
+      }));
+      
+      if (tf === state.timeframe && candles.length > 0) {
+        assetData.current = parseFloat(candles[candles.length - 1][4]);
+        const priceEl = document.getElementById(`${chartId}-price`);
+        if (priceEl) {
+          priceEl.textContent = `$${assetData.current.toLocaleString('en-US', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+          })}`;
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching ${pair}:`, error);
+    }
+  }
+  
+  // Store data
+  priceData[chartId] = assetData;
+  
+  // Update chart
+  if (charts[chartId]) {
+    charts[chartId].data.datasets[0].data = assetData.data[state.timeframe] || [];
+    charts[chartId].update();
   }
 }

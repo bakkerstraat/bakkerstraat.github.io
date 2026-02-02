@@ -64,7 +64,7 @@
     
     /* Header */
     header {
-      padding: 40px 0 30px 0;
+      padding: 40px 20px 30px 20px;
       text-align: left;
       border-bottom: 2px solid var(--border);
       margin-bottom: 30px;
@@ -127,16 +127,42 @@
     /* Controls */
     .controls {
       display: flex;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
       margin-bottom: 20px;
-      flex-wrap: wrap;
       gap: 15px;
     }
     
-    .view-toggle, .timeframe-toggle, .source-toggle {
+    .view-toggle {
       display: flex;
-      gap: 5px;
+      gap: 0;
+      border: 2px solid var(--border);
+      background: var(--dark-tertiary);
+    }
+    
+    .view-toggle .toggle-btn {
+      border: none;
+      border-right: 1px solid var(--border);
+    }
+    
+    .view-toggle .toggle-btn:last-child {
+      border-right: none;
+    }
+    
+    .timeframe-toggle {
+      display: flex;
+      gap: 0;
+      border: 2px solid var(--border);
+      background: var(--dark-tertiary);
+    }
+    
+    .timeframe-toggle .toggle-btn {
+      border: none;
+      border-right: 1px solid var(--border);
+    }
+    
+    .timeframe-toggle .toggle-btn:last-child {
+      border-right: none;
     }
     
     /* Custom Asset Search */
@@ -232,13 +258,13 @@
     }
     
     .refresh-btn {
-      padding: 10px 24px;
+      padding: 8px 16px;
       background: var(--dark-secondary);
       border: 1px solid var(--border);
       border-radius: 0;
-      color: var(--text);
+      color: var(--text-muted);
       cursor: pointer;
-      font-size: 0.85em;
+      font-size: 0.75em;
       font-weight: 500;
       transition: all 0.15s ease;
       font-family: 'JetBrains Mono', monospace;
