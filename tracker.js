@@ -162,47 +162,51 @@ async function fetchKrakenData() {
 }
 
 async function fetchHyperliquidSilver() {
+  console.log('Fetching silver from Hyperliquid...');
+  
   const intervals = {
     '1H': '1h',
-    '1D': '1d',
+    '1D': '1d', 
     '1W': '1w'
   };
   
-  console.log('Fetching silver from Hyperliquid...');
-  
   for (const [tf, interval] of Object.entries(intervals)) {
     try {
-      const endTime = Date.now();
-      const startTime = endTime - (tf === '1H' ? 24 * 3600000 : tf === '1D' ? 30 * 86400000 : 52 * 604800000);
-      
       const payload = {
         type: 'candleSnapshot',
         req: {
-          coin: CONFIG.hyperliquid.silver,
-          interval: interval,
-          startTime: startTime,
-          endTime: endTime
+          coin: 'AG',
+          interval: interval
         }
       };
       
-      const response = await fetch(CONFIG.hyperliquid.info, {
+      const response = await fetch('https://api.hyperliquid.xyz/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       
-      const data = await response.json();
-      
-      if (!data || data.length === 0) {
-        console.warn(`No Hyperliquid data for silver ${tf}`);
+      if (!response.ok) {
+        console.error(`Hyperliquid error ${tf}: ${response.status}`);
         if (!priceData.silver.data[tf]) {
-          priceData.silver.data[tf] = generateMockData(32, tf);
+          priceData.silver.data[tf] = generateMockCandles(32, tf);
           priceData.silver.current = 32;
         }
         continue;
       }
       
-      // Hyperliquid format: {t: timestamp, o: open, h: high, l: low, c: close, v: volume}
+      const data = await response.json();
+      
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        console.warn(`No Hyperliquid data for silver ${tf}`);
+        if (!priceData.silver.data[tf]) {
+          priceData.silver.data[tf] = generateMockCandles(32, tf);
+          priceData.silver.current = 32;
+        }
+        continue;
+      }
+      
+      // Hyperliquid format: {t: timestamp_ms, o: open, h: high, l: low, c: close, v: volume}
       priceData.silver.data[tf] = data.map(c => ({
         x: c.t,
         o: parseFloat(c.o),
@@ -222,7 +226,7 @@ async function fetchHyperliquidSilver() {
     } catch (error) {
       console.error(`Error fetching Hyperliquid silver ${tf}:`, error);
       if (!priceData.silver.data[tf]) {
-        priceData.silver.data[tf] = generateMockData(32, tf);
+        priceData.silver.data[tf] = generateMockCandles(32, tf);
         priceData.silver.current = 32;
       }
     }
@@ -310,22 +314,58 @@ function updatePriceDisplay(asset, price) {
 }
 
 function initializeCharts() {
+  // Custom candlestick chart plugin
+  const candlestickPlugin = {
+    id: 'candlestick',
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx;
+      const dataset = chart.data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+      
+      meta.data.forEach((bar, index) => {
+        const candle = dataset.data[index];
+        if (!candle || !candle.o) return;
+        
+        const x = bar.x;
+        const yOpen = chart.scales.y.getPixelForValue(candle.o);
+        const yClose = chart.scales.y.getPixelForValue(candle.c);
+        const yHigh = chart.scales.y.getPixelForValue(candle.h);
+        const yLow = chart.scales.y.getPixelForValue(candle.l);
+        
+        const isUp = candle.c >= candle.o;
+        const color = isUp ? '#00ff00' : '#ff0000';
+        
+        // Draw wick (high-low line)
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.moveTo(x, yHigh);
+        ctx.lineTo(x, yLow);
+        ctx.stroke();
+        
+        // Draw body (open-close rectangle)
+        const bodyHeight = Math.abs(yClose - yOpen);
+        const bodyY = Math.min(yOpen, yClose);
+        const bodyWidth = bar.width * 0.8;
+        
+        ctx.fillStyle = isUp ? 'rgba(0,255,0,0.8)' : 'rgba(255,50,50,0.8)';
+        ctx.fillRect(x - bodyWidth / 2, bodyY, bodyWidth, bodyHeight || 1);
+        ctx.strokeStyle = color;
+        ctx.strokeRect(x - bodyWidth / 2, bodyY, bodyWidth, bodyHeight || 1);
+      });
+    }
+  };
+  
   // Helper to create candlestick chart config
   const createCandlestickChart = (color, label) => ({
     type: 'bar',
+    plugins: [candlestickPlugin],
     data: {
       datasets: [{
         label: label,
         data: [],
-        backgroundColor: (ctx) => {
-          if (!ctx.raw || !ctx.raw.o) return color;
-          return ctx.raw.c >= ctx.raw.o ? 'rgba(0,200,0,0.8)' : 'rgba(255,50,50,0.8)';
-        },
-        borderColor: (ctx) => {
-          if (!ctx.raw || !ctx.raw.o) return color;
-          return ctx.raw.c >= ctx.raw.o ? '#00ff00' : '#ff0000';
-        },
-        borderWidth: 1.5,
+        backgroundColor: 'transparent', // Let plugin draw it
+        borderColor: 'transparent',
         barPercentage: 0.8
       }]
     },
