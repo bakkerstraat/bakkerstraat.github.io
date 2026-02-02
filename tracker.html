@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metal-Crypto Tracker</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
     
     * {
       margin: 0;
@@ -19,9 +19,11 @@
       --bitcoin: #F7931A;
       --dark: #0a0a0a;
       --dark-secondary: #1a1a1a;
+      --dark-tertiary: #252525;
       --text: #e0e0e0;
       --text-muted: #888;
       --accent: #00d4ff;
+      --border: rgba(255, 255, 255, 0.08);
     }
     
     body {
@@ -30,6 +32,8 @@
       color: var(--text);
       line-height: 1.6;
       overflow-x: hidden;
+      font-size: 15px;
+      font-weight: 400;
     }
     
     /* Background */
@@ -188,43 +192,46 @@
     .toggle-btn {
       padding: 10px 20px;
       background: var(--dark-secondary);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
       cursor: pointer;
       font-size: 0.9em;
       font-weight: 500;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
       font-family: 'Inter', sans-serif;
     }
     
     .toggle-btn:hover {
       border-color: var(--accent);
-      color: var(--accent);
+      color: var(--text);
+      background: var(--dark-tertiary);
     }
     
     .toggle-btn.active {
       background: var(--accent);
       color: var(--dark);
       border-color: var(--accent);
+      font-weight: 600;
     }
     
     .refresh-btn {
-      padding: 10px 25px;
-      background: linear-gradient(135deg, var(--gold) 0%, var(--bitcoin) 100%);
-      color: var(--dark);
-      border: none;
-      border-radius: 8px;
+      padding: 10px 24px;
+      background: var(--dark-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
       cursor: pointer;
       font-size: 0.9em;
-      font-weight: 600;
-      transition: all 0.3s ease;
+      font-weight: 500;
+      transition: all 0.2s ease;
       font-family: 'Inter', sans-serif;
     }
     
     .refresh-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+      background: var(--dark-tertiary);
+      border-color: var(--accent);
+      color: var(--accent);
     }
     
     .refresh-btn:disabled {
@@ -453,8 +460,8 @@
     
     <!-- Navigation -->
     <nav>
-      <a href="index.html" class="nav-btn">🎵 Music & Art</a>
-      <a href="tracker.html" class="nav-btn active">📊 Tracker</a>
+      <a href="index.html" class="nav-btn">Music & Art</a>
+      <a href="tracker.html" class="nav-btn active">Tracker</a>
     </nav>
     
     <!-- Controls -->
@@ -472,7 +479,7 @@
         <button class="toggle-btn" id="1w-btn">1W</button>
       </div>
       
-      <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
+      <button class="refresh-btn" id="refresh-btn">Refresh</button>
     </div>
     
     <!-- Custom Asset Search -->
@@ -487,7 +494,6 @@
       <div class="chart-card gold-card">
         <div class="chart-header">
           <div class="chart-title">
-            <span class="asset-icon">🥇</span>
             <span>Gold (XAU/USD)</span>
           </div>
           <div class="price-info">
@@ -505,7 +511,6 @@
       <div class="chart-card silver-card">
         <div class="chart-header">
           <div class="chart-title">
-            <span class="asset-icon">🥈</span>
             <span>Silver (XAG/USD)</span>
           </div>
           <div class="price-info">
@@ -523,7 +528,6 @@
       <div class="chart-card bitcoin-card">
         <div class="chart-header">
           <div class="chart-title">
-            <span class="asset-icon">₿</span>
             <span>Bitcoin (BTC/USD)</span>
           </div>
           <div class="price-info">

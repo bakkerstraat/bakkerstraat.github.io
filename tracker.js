@@ -110,7 +110,7 @@ async function fetchAllPrices() {
     console.error('Error:', error);
   } finally {
     btn.disabled = false;
-    btn.textContent = '🔄 Refresh';
+    btn.textContent = 'Refresh';
   }
 }
 
@@ -164,18 +164,15 @@ async function fetchKrakenData() {
 async function fetchHyperliquidSilver() {
   console.log('Fetching silver from Hyperliquid...');
   
-  const intervals = {
-    '1H': '1h',
-    '1D': '1d', 
-    '1W': '1w'
-  };
+  const intervals = { '1H': '1h', '1D': '1d', '1W': '1w' };
   
   for (const [tf, interval] of Object.entries(intervals)) {
     try {
+      // Try @0 suffix (perp contract format)
       const payload = {
         type: 'candleSnapshot',
         req: {
-          coin: 'AG',
+          coin: '@0',  // Silver perp index
           interval: interval
         }
       };
@@ -187,26 +184,31 @@ async function fetchHyperliquidSilver() {
       });
       
       if (!response.ok) {
-        console.error(`Hyperliquid error ${tf}: ${response.status}`);
+        console.error(`Hyperliquid error ${tf}: ${response.status} ${response.statusText}`);
+        const text = await response.text();
+        console.error('Response:', text);
+        
         if (!priceData.silver.data[tf]) {
           priceData.silver.data[tf] = generateMockCandles(32, tf);
           priceData.silver.current = 32;
+          updatePriceDisplay('silver', 32);
         }
         continue;
       }
       
       const data = await response.json();
+      console.log(`Hyperliquid ${tf} response:`, data);
       
       if (!data || !Array.isArray(data) || data.length === 0) {
         console.warn(`No Hyperliquid data for silver ${tf}`);
         if (!priceData.silver.data[tf]) {
           priceData.silver.data[tf] = generateMockCandles(32, tf);
           priceData.silver.current = 32;
+          updatePriceDisplay('silver', 32);
         }
         continue;
       }
       
-      // Hyperliquid format: {t: timestamp_ms, o: open, h: high, l: low, c: close, v: volume}
       priceData.silver.data[tf] = data.map(c => ({
         x: c.t,
         o: parseFloat(c.o),
@@ -228,6 +230,7 @@ async function fetchHyperliquidSilver() {
       if (!priceData.silver.data[tf]) {
         priceData.silver.data[tf] = generateMockCandles(32, tf);
         priceData.silver.current = 32;
+        updatePriceDisplay('silver', 32);
       }
     }
   }
@@ -465,6 +468,24 @@ function updateCombinedChart() {
 function addCustomAsset() {
   const input = document.getElementById('asset-search');
   const symbol = input.value.trim().toUpperCase();
-  console.log('Adding asset:', symbol);
-  input.value = '';
+  
+  if (!symbol) {
+    alert('Please enter an asset symbol');
+    return;
+  }
+  
+  // Search in loaded Kraken pairs
+  const match = state.krakenPairs.find(p => 
+    p.includes(symbol + 'USD') || 
+    p.includes(symbol + 'USDT') ||
+    p === symbol
+  );
+  
+  if (match) {
+    console.log(`Found ${symbol} on Kraken: ${match}`);
+    alert(`Found: ${match}\n\n(Custom charts feature coming soon)`);
+    input.value = '';
+  } else {
+    alert(`Asset "${symbol}" not found on Kraken.\n\nTry: BTC, ETH, SOL, DOGE, etc.`);
+  }
 }
