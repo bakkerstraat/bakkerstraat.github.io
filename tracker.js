@@ -18,6 +18,7 @@ let state = {
 let charts = {};
 let priceData = {
   gold: { current: 0, data: {} },
+  silver: { current: 0, data: {} },
   bitcoin: { current: 0, data: {} }
 };
 
@@ -73,6 +74,7 @@ async function fetchAllPrices() {
   
   try {
     await fetchKrakenData();
+    await fetchSilverFromCSV();
     updateAllCharts();
     console.log('Prices loaded successfully');
   } catch (error) {
@@ -132,6 +134,83 @@ async function fetchKrakenData() {
       }
     }
   }
+}
+
+async function fetchSilverFromCSV() {
+  console.log('Fetching silver from CSV...');
+  
+  try {
+    // Fetch hourly CSV
+    const response = await fetch('prices_hourly.csv');
+    if (!response.ok) throw new Error('CSV not found');
+    
+    const csvText = await response.text();
+    const lines = csvText.trim().split('\n');
+    
+    if (lines.length < 2) throw new Error('CSV empty');
+    
+    // Parse data
+    const allData = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',');
+      if (parts.length < 3) continue;
+      
+      const timestamp = new Date(parts[0]).getTime();
+      const price = parseFloat(parts[2]); // silver is 3rd column
+      
+      if (!isNaN(timestamp) && !isNaN(price) && price > 0) {
+        allData.push({ time: timestamp, price });
+      }
+    }
+    
+    if (allData.length === 0) throw new Error('No valid data');
+    
+    // Sort by time
+    allData.sort((a, b) => a.time - b.time);
+    
+    // Set current price
+    priceData.silver.current = allData[allData.length - 1].price;
+    updatePriceDisplay('silver', priceData.silver.current);
+    
+    // Convert to candlesticks
+    priceData.silver.data['1H'] = convertToCandles(allData, 3600000, 24);
+    priceData.silver.data['1D'] = convertToCandles(allData, 86400000, 30);
+    priceData.silver.data['1W'] = convertToCandles(allData, 604800000, 12);
+    
+    console.log(`✓ Silver: ${allData.length} data points loaded`);
+    
+  } catch (error) {
+    console.error('Silver CSV error:', error.message);
+    priceData.silver.current = 0;
+    priceData.silver.data['1H'] = [];
+    priceData.silver.data['1D'] = [];
+    priceData.silver.data['1W'] = [];
+  }
+}
+
+function convertToCandles(dataPoints, intervalMs, maxCandles) {
+  if (!dataPoints || dataPoints.length === 0) return [];
+  
+  const candles = [];
+  const now = Date.now();
+  const startTime = now - (maxCandles * intervalMs);
+  
+  for (let time = startTime; time <= now; time += intervalMs) {
+    const endTime = time + intervalMs;
+    const points = dataPoints.filter(p => p.time >= time && p.time < endTime);
+    
+    if (points.length === 0) continue;
+    
+    const prices = points.map(p => p.price);
+    const o = prices[0];
+    const c = prices[prices.length - 1];
+    const h = Math.max(...prices);
+    const l = Math.min(...prices);
+    
+    candles.push({ x: time, o, h, l, c, y: c });
+  }
+  
+  return candles;
 }
 
 function updatePriceDisplay(asset, price) {
@@ -241,6 +320,7 @@ function initializeCharts() {
   });
   
   charts.gold = new Chart(document.getElementById('gold-chart'), chartConfig('Gold'));
+  charts.silver = new Chart(document.getElementById('silver-chart'), chartConfig('Silver'));
   charts.bitcoin = new Chart(document.getElementById('bitcoin-chart'), chartConfig('Bitcoin'));
   
   // Combined chart
@@ -249,6 +329,7 @@ function initializeCharts() {
     data: {
       datasets: [
         { label: 'Gold', data: [], borderColor: '#FFD700', borderWidth: 2, tension: 0.4, yAxisID: 'y-gold', pointRadius: 0, pointHoverRadius: 4 },
+        { label: 'Silver', data: [], borderColor: '#C0C0C0', borderWidth: 2, tension: 0.4, yAxisID: 'y-silver', pointRadius: 0, pointHoverRadius: 4 },
         { label: 'Bitcoin', data: [], borderColor: '#F7931A', borderWidth: 2, tension: 0.4, yAxisID: 'y-bitcoin', pointRadius: 0, pointHoverRadius: 4 }
       ]
     },
@@ -259,6 +340,7 @@ function initializeCharts() {
       scales: {
         x: { type: 'time', time: { unit: 'day' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } },
         'y-gold': { type: 'linear', position: 'left', grid: { color: 'rgba(255,215,0,0.1)' }, ticks: { color: '#FFD700', callback: (v) => '$' + v.toFixed(0) } },
+        'y-silver': { type: 'linear', position: 'right', grid: { display: false }, ticks: { color: '#C0C0C0', callback: (v) => '$' + v.toFixed(0) } },
         'y-bitcoin': { type: 'linear', position: 'right', grid: { display: false }, ticks: { color: '#F7931A', callback: (v) => '$' + v.toFixed(0) } }
       }
     }
@@ -270,7 +352,7 @@ function initializeCharts() {
 function updateAllCharts() {
   const unit = state.timeframe === '1H' ? 'hour' : state.timeframe === '1D' ? 'day' : 'week';
   
-  ['gold', 'bitcoin'].forEach(asset => {
+  ['gold', 'silver', 'bitcoin'].forEach(asset => {
     const chart = charts[asset];
     if (chart) {
       chart.options.scales.x.time.unit = unit;
@@ -286,6 +368,7 @@ function updateAllCharts() {
 
 function updateCombinedChart() {
   charts.combined.data.datasets[0].data = priceData.gold.data[state.timeframe] || [];
-  charts.combined.data.datasets[1].data = priceData.bitcoin.data[state.timeframe] || [];
+  charts.combined.data.datasets[1].data = priceData.silver.data[state.timeframe] || [];
+  charts.combined.data.datasets[2].data = priceData.bitcoin.data[state.timeframe] || [];
   charts.combined.update();
 }
