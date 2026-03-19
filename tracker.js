@@ -164,61 +164,57 @@ async function fetchSilverFromCSV() {
   
   try {
     const response = await fetch('prices_hourly.csv');
-    const csvText = await response.text();
     
-    // Parse CSV
-    const lines = csvText.split('\n');
-    const headers = lines[0].split(',');
-    
-    // Find silver column
-    const silverIndex = headers.findIndex(h => h.toLowerCase().includes('silver'));
-    const timeIndex = headers.findIndex(h => h.toLowerCase().includes('time') || h.toLowerCase().includes('date'));
-    
-    if (silverIndex === -1) {
-      console.error('Silver column not found in CSV');
-      priceData.silver.data['1H'] = generateMockCandles(32, '1H');
-      priceData.silver.data['1D'] = generateMockCandles(32, '1D');
-      priceData.silver.data['1W'] = generateMockCandles(32, '1W');
-      priceData.silver.current = 32;
-      updatePriceDisplay('silver', 32);
-      return;
+    if (!response.ok) {
+      throw new Error(`CSV not found: ${response.status}`);
     }
     
-    // Parse data
+    const csvText = await response.text();
+    const lines = csvText.split('\n').filter(line => line.trim());
+    
+    if (lines.length < 2) {
+      throw new Error('CSV is empty or malformed');
+    }
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const silverIndex = headers.findIndex(h => h.toLowerCase().includes('silver'));
+    const timeIndex = headers.findIndex(h => h.toLowerCase().includes('time') || h.toLowerCase().includes('date') || h.toLowerCase().includes('timestamp'));
+    
+    if (silverIndex === -1 || timeIndex === -1) {
+      throw new Error(`Required columns not found. Headers: ${headers.join(', ')}`);
+    }
+    
     const allData = [];
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
-      
-      const cols = lines[i].split(',');
+      const cols = lines[i].split(',').map(c => c.trim());
       const timestamp = new Date(cols[timeIndex]).getTime();
       const price = parseFloat(cols[silverIndex]);
       
-      if (!isNaN(timestamp) && !isNaN(price)) {
+      if (!isNaN(timestamp) && !isNaN(price) && price > 0) {
         allData.push({ time: timestamp, price });
       }
     }
     
     if (allData.length === 0) {
-      console.error('No valid silver data in CSV');
-      return;
+      throw new Error('No valid price data found in CSV');
     }
     
-    // Sort by time
     allData.sort((a, b) => a.time - b.time);
     
-    // Set current price
     priceData.silver.current = allData[allData.length - 1].price;
     updatePriceDisplay('silver', priceData.silver.current);
     
-    // Convert to candlestick format for each timeframe
-    priceData.silver.data['1H'] = convertToCandles(allData, 3600000); // 1 hour
-    priceData.silver.data['1D'] = convertToCandles(allData, 86400000); // 1 day
-    priceData.silver.data['1W'] = convertToCandles(allData, 604800000); // 1 week
+    priceData.silver.data['1H'] = convertToCandles(allData, 3600000);
+    priceData.silver.data['1D'] = convertToCandles(allData, 86400000);
+    priceData.silver.data['1W'] = convertToCandles(allData, 604800000);
     
-    console.log('✓ Silver loaded from CSV');
+    console.log(`✓ Silver loaded from CSV: ${allData.length} data points`);
     
   } catch (error) {
-    console.error('Error loading silver CSV:', error);
+    console.error('Error loading silver CSV:', error.message);
+    console.log('Using fallback mock data for silver');
+    
+    // Fallback to mock data
     priceData.silver.data['1H'] = generateMockCandles(32, '1H');
     priceData.silver.data['1D'] = generateMockCandles(32, '1D');
     priceData.silver.data['1W'] = generateMockCandles(32, '1W');
