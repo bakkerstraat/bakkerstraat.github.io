@@ -105,6 +105,7 @@ async function fetchAllPrices() {
   
   try {
     await fetchKrakenData();
+    await fetchSilverFromCSV();
     updateAllCharts();
   } catch (error) {
     console.error('Error:', error);
@@ -156,9 +157,104 @@ async function fetchKrakenData() {
       }
     }
   }
+}
+
+async function fetchSilverFromCSV() {
+  console.log('Fetching silver from CSV...');
   
-  // Fetch Silver from Hyperliquid
-  await fetchHyperliquidSilver();
+  try {
+    const response = await fetch('prices_hourly.csv');
+    const csvText = await response.text();
+    
+    // Parse CSV
+    const lines = csvText.split('\n');
+    const headers = lines[0].split(',');
+    
+    // Find silver column
+    const silverIndex = headers.findIndex(h => h.toLowerCase().includes('silver'));
+    const timeIndex = headers.findIndex(h => h.toLowerCase().includes('time') || h.toLowerCase().includes('date'));
+    
+    if (silverIndex === -1) {
+      console.error('Silver column not found in CSV');
+      priceData.silver.data['1H'] = generateMockCandles(32, '1H');
+      priceData.silver.data['1D'] = generateMockCandles(32, '1D');
+      priceData.silver.data['1W'] = generateMockCandles(32, '1W');
+      priceData.silver.current = 32;
+      updatePriceDisplay('silver', 32);
+      return;
+    }
+    
+    // Parse data
+    const allData = [];
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      
+      const cols = lines[i].split(',');
+      const timestamp = new Date(cols[timeIndex]).getTime();
+      const price = parseFloat(cols[silverIndex]);
+      
+      if (!isNaN(timestamp) && !isNaN(price)) {
+        allData.push({ time: timestamp, price });
+      }
+    }
+    
+    if (allData.length === 0) {
+      console.error('No valid silver data in CSV');
+      return;
+    }
+    
+    // Sort by time
+    allData.sort((a, b) => a.time - b.time);
+    
+    // Set current price
+    priceData.silver.current = allData[allData.length - 1].price;
+    updatePriceDisplay('silver', priceData.silver.current);
+    
+    // Convert to candlestick format for each timeframe
+    priceData.silver.data['1H'] = convertToCandles(allData, 3600000); // 1 hour
+    priceData.silver.data['1D'] = convertToCandles(allData, 86400000); // 1 day
+    priceData.silver.data['1W'] = convertToCandles(allData, 604800000); // 1 week
+    
+    console.log('✓ Silver loaded from CSV');
+    
+  } catch (error) {
+    console.error('Error loading silver CSV:', error);
+    priceData.silver.data['1H'] = generateMockCandles(32, '1H');
+    priceData.silver.data['1D'] = generateMockCandles(32, '1D');
+    priceData.silver.data['1W'] = generateMockCandles(32, '1W');
+    priceData.silver.current = 32;
+    updatePriceDisplay('silver', 32);
+  }
+}
+
+function convertToCandles(dataPoints, intervalMs) {
+  if (!dataPoints || dataPoints.length === 0) return [];
+  
+  const candles = [];
+  const now = Date.now();
+  const startTime = now - (intervalMs === 3600000 ? 24 * intervalMs : intervalMs === 86400000 ? 30 * intervalMs : 52 * intervalMs);
+  
+  // Group data points into intervals
+  for (let time = startTime; time <= now; time += intervalMs) {
+    const endTime = time + intervalMs;
+    const pointsInInterval = dataPoints.filter(p => p.time >= time && p.time < endTime);
+    
+    if (pointsInInterval.length === 0) continue;
+    
+    const prices = pointsInInterval.map(p => p.price);
+    const o = prices[0];
+    const c = prices[prices.length - 1];
+    const h = Math.max(...prices);
+    const l = Math.min(...prices);
+    
+    candles.push({
+      x: time,
+      o, h, l, c,
+      y: c
+    });
+  }
+  
+  return candles;
 }
 
 async function fetchHyperliquidSilver() {
@@ -225,15 +321,6 @@ async function fetchHyperliquidSilver() {
       
       console.log(`✓ Hyperliquid silver ${tf}: ${data.length} candles`);
       
-    } catch (error) {
-      console.error(`Error fetching Hyperliquid silver ${tf}:`, error);
-      if (!priceData.silver.data[tf]) {
-        priceData.silver.data[tf] = generateMockCandles(32, tf);
-        priceData.silver.current = 32;
-        updatePriceDisplay('silver', 32);
-      }
-    }
-  }
 }
 
 async function fetchGoldPriceZData() {
